@@ -3,12 +3,14 @@ PhoBERT Training with HuggingFace Trainer API
 Supports: FP16, 8-bit optimizer, cosine scheduler, per-aspect oversampling
 """
 import os
+import sys
 import yaml
 import pandas as pd
 import numpy as np
 import torch
 import logging
 from pathlib import Path
+from datetime import datetime
 
 from transformers import (
     AutoTokenizer,
@@ -21,12 +23,56 @@ from transformers import (
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report
 from torch.utils.data import Dataset
 
+# Import checkpoint renamer
+from checkpoint_renamer import SimpleMetricCheckpointCallback
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# TeeLogger - Log to both console and file
+# ============================================================================
+
+class TeeLogger:
+    """Logger ghi đồng thời ra console và file"""
+    def __init__(self, log_file):
+        self.terminal = sys.stdout
+        self.log = open(log_file, 'w', encoding='utf-8')
+    
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+        self.log.flush()
+    
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
+    
+    def close(self):
+        self.log.close()
+
+
+def setup_logging():
+    """Thiết lập logging ra file với timestamp"""
+    # Tạo tên file log với timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_dir = "logs"
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, f"training_log_{timestamp}.txt")
+    
+    # Tạo TeeLogger để ghi cả console và file
+    tee = TeeLogger(log_file)
+    sys.stdout = tee
+    sys.stderr = tee
+    
+    print(f"📝 Training log sẽ được lưu tại: {log_file}\n")
+    
+    return tee, log_file
 
 
 # ============================================================================
@@ -173,6 +219,11 @@ def load_data(file_path, sentiment_mapping, text_col, aspect_col, label_col, app
 # ============================================================================
 
 def main():
+    # =====================================================================
+    # 0. SETUP LOGGING TO FILE
+    # =====================================================================
+    tee_logger, log_file_path = setup_logging()
+    
     # Load config
     print("=" * 80)
     print("PhoBERT ABSA Training with HuggingFace Trainer")
@@ -362,7 +413,30 @@ def main():
     logger.info(f"FP16: {config['training']['fp16']}")
     logger.info(f"Optimizer: {config['training']['optim']}")
     
+    # =========================================================================
+    # Setup Callbacks
+    # =========================================================================
+    logger.info("=" * 80)
+    logger.info("Setting up Callbacks")
+    logger.info("=" * 80)
+    
+    # Checkpoint renamer callback - rename by F1 score (4 digits)
+    checkpoint_callback = SimpleMetricCheckpointCallback(metric_name='eval_f1', multiply_by=10000)
+    logger.info("✓ Checkpoint Renamer: Will rename checkpoints by F1 score (e.g., checkpoint-8753 = 87.53%)")
+    
+    # Early stopping callback
+    early_stopping_callback = EarlyStoppingCallback(
+        early_stopping_patience=config['training']['early_stopping_patience'],
+        early_stopping_threshold=config['training']['early_stopping_threshold']
+    )
+    logger.info(f"✓ Early Stopping: patience={config['training']['early_stopping_patience']}, threshold={config['training']['early_stopping_threshold']}")
+    
     # Create Trainer
+    logger.info("")
+    logger.info("=" * 80)
+    logger.info("Creating Trainer")
+    logger.info("=" * 80)
+    
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -370,19 +444,31 @@ def main():
         eval_dataset=val_dataset,
         compute_metrics=compute_metrics,
         callbacks=[
-            EarlyStoppingCallback(
-                early_stopping_patience=config['training']['early_stopping_patience'],
-                early_stopping_threshold=config['training']['early_stopping_threshold']
-            )
+            checkpoint_callback,
+            early_stopping_callback
         ]
     )
     
-    # Train
-    logger.info("=" * 80)
-    logger.info("Training")
-    logger.info("=" * 80)
+    logger.info("✓ Trainer created successfully")
     
-    trainer.train()
+    # Train
+    logger.info("")
+    logger.info("=" * 80)
+    logger.info("🎯 STARTING TRAINING")
+    logger.info("=" * 80)
+    logger.info("")
+    
+    train_result = trainer.train()
+    
+    # Log training results
+    logger.info("")
+    logger.info("=" * 80)
+    logger.info("✅ TRAINING COMPLETED")
+    logger.info("=" * 80)
+    logger.info(f"✓ Training loss: {train_result.training_loss:.4f}")
+    logger.info(f"✓ Training time: {train_result.metrics['train_runtime']:.2f}s")
+    logger.info(f"✓ Samples/second: {train_result.metrics['train_samples_per_second']:.2f}")
+    logger.info(f"✓ Steps/second: {train_result.metrics['train_steps_per_second']:.2f}")
     
     # Evaluate on test set
     logger.info("=" * 80)
@@ -452,9 +538,28 @@ def main():
     tokenizer.save_pretrained(best_model_path)
     logger.info(f"Best model saved: {best_model_path}")
     
+    logger.info("")
     logger.info("=" * 80)
-    logger.info("Training Complete!")
+    logger.info("🎉 TRAINING COMPLETE!")
     logger.info("=" * 80)
+    logger.info("")
+    logger.info("✓ Summary:")
+    logger.info(f"   • Model fine-tuned successfully")
+    logger.info(f"   • Training loss: {train_result.training_loss:.4f}")
+    logger.info(f"   • Test F1: {test_metrics['test_f1']:.4f}")
+    logger.info(f"   • Best model saved: {best_model_path}")
+    logger.info(f"   • Evaluation report: {report_path}")
+    logger.info(f"   • Predictions: {pred_path}")
+    logger.info("")
+    logger.info(f"📝 Training log saved: {log_file_path}")
+    logger.info("")
+    
+    # =====================================================================
+    # RESTORE STDOUT/STDERR AND CLOSE LOGGER
+    # =====================================================================
+    sys.stdout = tee_logger.terminal
+    sys.stderr = tee_logger.terminal
+    tee_logger.close()
 
 
 if __name__ == '__main__':
