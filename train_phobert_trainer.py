@@ -214,13 +214,32 @@ def main():
     logger.info("Loading Data")
     logger.info("=" * 80)
     
+    # Determine which training file to use
+    use_oversampled = config['data'].get('use_oversampled_file', False)
+    
+    if use_oversampled:
+        train_file = config['paths']['train_oversampled_file']
+        apply_oversampling_on_fly = False
+        logger.info(f"Using pre-oversampled file: {train_file}")
+        
+        # Check if oversampled file exists
+        if not os.path.exists(train_file):
+            logger.warning(f"Oversampled file not found: {train_file}")
+            logger.warning("Falling back to original file with on-the-fly oversampling")
+            train_file = config['paths']['train_file']
+            apply_oversampling_on_fly = True
+    else:
+        train_file = config['paths']['train_file']
+        apply_oversampling_on_fly = config['data']['oversampling']
+        logger.info(f"Using original file with on-the-fly oversampling: {train_file}")
+    
     train_sentences, train_aspects, train_labels = load_data(
-        config['paths']['train_file'],
+        train_file,
         sentiment_mapping,
         config['data']['text_column'],
         config['data']['aspect_column'],
         config['data']['label_column'],
-        apply_oversampling=config['data']['oversampling']
+        apply_oversampling=apply_oversampling_on_fly
     )
     
     val_sentences, val_aspects, val_labels = load_data(

@@ -8,6 +8,7 @@
 paths:
   data_dir: "data"
   train_file: "data/train.csv"
+  train_oversampled_file: "data/train_oversampled.csv"
   validation_file: "data/val.csv"
   test_file: "data/test.csv"
   output_dir: "checkpoints/phobert_finetuned"
@@ -47,7 +48,10 @@ data:
   label_column: "sentiment"
   
   # Oversampling configuration
-  oversampling: true
+  # If use_oversampled_file is true, loads from train_oversampled_file
+  # If false, performs oversampling on-the-fly during training
+  use_oversampled_file: true  # Use pre-generated oversampled file
+  oversampling: true  # Legacy flag for backward compatibility
   oversampling_strategy: "per_aspect"  # oversample each aspect independently
 
 training:
@@ -73,7 +77,6 @@ training:
   # Learning rate scheduler
   lr_scheduler_type: "cosine"
   warmup_ratio: 0.06
-  warmup_steps: 500  # Alternative to warmup_ratio
   
   # Training duration
   num_train_epochs: 5
