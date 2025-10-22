@@ -1,0 +1,48 @@
+# Checkpoints and model weights
+checkpoints/
+*.pt
+*.pth
+*.bin
+*.ckpt
+
+# Logs
+logs/
+*.log
+
+# Results and outputs
+results/
+outputs/
+predictions/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Data (if needed)
+# data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# HuggingFace cache
+.cache/

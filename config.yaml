@@ -55,15 +55,15 @@ data:
   oversampling_strategy: "per_aspect"  # oversample each aspect independently
 
 training:
-  # Batch size (optimized for RTX 3070)
-  per_device_train_batch_size: 32
-  per_device_eval_batch_size: 64  # 2x (no gradients in eval)
-  gradient_accumulation_steps: 2   # Effective batch = 64
+  # Batch size (optimized for RTX 4060 8GB VRAM)
+  per_device_train_batch_size: 16
+  per_device_eval_batch_size: 32  # 2x (no gradients in eval)
+  gradient_accumulation_steps: 4   # Effective batch = 64
 
-  # Alternative for lower memory:
-  # per_device_train_batch_size: 16
-  # per_device_eval_batch_size: 32
-  # gradient_accumulation_steps: 4
+  # Alternative for higher memory (12GB+):
+  # per_device_train_batch_size: 32
+  # per_device_eval_batch_size: 64
+  # gradient_accumulation_steps: 2
   
   # Optimizer settings
   optim: "adamw_bnb_8bit"  # 8-bit AdamW for memory efficiency
@@ -81,7 +81,7 @@ training:
   # Training duration
   num_train_epochs: 5
   
-  # Mixed precision (RTX 3070 Ampere)
+  # Mixed precision (RTX 4060 Ada Lovelace)
   fp16: true
   fp16_opt_level: "O2"
   fp16_full_eval: false
