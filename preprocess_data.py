@@ -4,6 +4,7 @@ import yaml
 from pathlib import Path
 import logging
 import argparse
+from sklearn.model_selection import train_test_split
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -98,7 +99,10 @@ def convert_multi_aspect_to_single_label(input_file: str, output_file: str):
 
 def split_data(input_file: str, output_dir: str, train_ratio=0.8, val_ratio=0.1, test_ratio=0.1, random_state=42):
     """
-    Split data into train, validation, and test sets.
+    Split data into train, validation, and test sets with STRATIFICATION.
+    
+    This ensures balanced representation of all aspect-sentiment pairs across splits,
+    which is critical for reliable ABSA evaluation (especially for rare combinations).
     
     Args:
         input_file: path to the single-label CSV file
@@ -115,18 +119,36 @@ def split_data(input_file: str, output_dir: str, train_ratio=0.8, val_ratio=0.1,
     if not np.isclose(train_ratio + val_ratio + test_ratio, 1.0):
         raise ValueError(f"Ratios must sum to 1.0, got {train_ratio + val_ratio + test_ratio}")
     
-    # Shuffle data
-    df = df.sample(frac=1, random_state=random_state).reset_index(drop=True)
+    logger.info(f"Using STRATIFIED split to ensure balanced aspect-sentiment pairs")
     
-    # Calculate split indices
-    n = len(df)
-    train_end = int(n * train_ratio)
-    val_end = train_end + int(n * val_ratio)
+    # Create stratify label by combining aspect and sentiment
+    df['stratify_label'] = df['aspect'] + '_' + df['sentiment']
     
-    # Split data
-    train_df = df[:train_end]
-    val_df = df[train_end:val_end]
-    test_df = df[val_end:]
+    logger.info(f"Found {df['stratify_label'].nunique()} unique aspect-sentiment combinations")
+    
+    # Split 1: (train + val) vs test with stratification
+    train_val_df, test_df = train_test_split(
+        df,
+        test_size=test_ratio,
+        random_state=random_state,
+        stratify=df['stratify_label'],
+        shuffle=True
+    )
+    
+    # Split 2: train vs val with stratification
+    val_ratio_adjusted = val_ratio / (train_ratio + val_ratio)
+    train_df, val_df = train_test_split(
+        train_val_df,
+        test_size=val_ratio_adjusted,
+        random_state=random_state,
+        stratify=train_val_df['stratify_label'],
+        shuffle=True
+    )
+    
+    # Remove stratify_label column (not needed in output)
+    train_df = train_df.drop('stratify_label', axis=1).reset_index(drop=True)
+    val_df = val_df.drop('stratify_label', axis=1).reset_index(drop=True)
+    test_df = test_df.drop('stratify_label', axis=1).reset_index(drop=True)
     
     # Create output directory
     output_path = Path(output_dir)
@@ -142,15 +164,21 @@ def split_data(input_file: str, output_dir: str, train_ratio=0.8, val_ratio=0.1,
     test_df.to_csv(test_file, index=False, encoding='utf-8')
     
     # Log statistics
-    logger.info(f"\nData split complete:")
-    logger.info(f"Train: {len(train_df)} samples ({train_ratio*100:.1f}%) -> {train_file}")
-    logger.info(f"Val:   {len(val_df)} samples ({val_ratio*100:.1f}%) -> {val_file}")
-    logger.info(f"Test:  {len(test_df)} samples ({test_ratio*100:.1f}%) -> {test_file}")
+    logger.info(f"\nStratified split complete:")
+    logger.info(f"Train: {len(train_df)} samples ({len(train_df)/len(df)*100:.1f}%) -> {train_file}")
+    logger.info(f"Val:   {len(val_df)} samples ({len(val_df)/len(df)*100:.1f}%) -> {val_file}")
+    logger.info(f"Test:  {len(test_df)} samples ({len(test_df)/len(df)*100:.1f}%) -> {test_file}")
     
     # Log sentiment distribution per split
     for split_name, split_df in [('Train', train_df), ('Val', val_df), ('Test', test_df)]:
         logger.info(f"\n{split_name} sentiment distribution:")
         logger.info(split_df['sentiment'].value_counts())
+        
+    # Log aspect distribution to verify stratification
+    logger.info(f"\nVerifying stratification - aspect distribution:")
+    for split_name, split_df in [('Train', train_df), ('Val', val_df), ('Test', test_df)]:
+        logger.info(f"\n{split_name} top 5 aspects:")
+        logger.info(split_df['aspect'].value_counts().head())
 
 
 def main():
