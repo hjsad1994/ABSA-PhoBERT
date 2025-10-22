@@ -232,10 +232,15 @@ def main():
     with open('config.yaml', 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
     
-    # Set seed
-    seed = config['general']['seed']
+    # Set seed for reproducibility
+    # Priority: reproducibility.training_seed > training.seed > general.seed
+    seed = config.get('reproducibility', {}).get('training_seed', 
+           config.get('training', {}).get('seed',
+           config.get('general', {}).get('seed', 42)))
+    
     set_seed(seed)
-    logger.info(f"Seed: {seed}")
+    logger.info(f"Random seed for training: {seed}")
+    logger.info(f"(Ensures reproducible results for research)")
     
     # Create output directories
     os.makedirs(config['paths']['output_dir'], exist_ok=True)

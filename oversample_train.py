@@ -5,8 +5,10 @@ Input: data/train.csv
 Output: data/train_oversampled.csv
 """
 import os
+import yaml
 import pandas as pd
 import logging
+import argparse
 from pathlib import Path
 
 # Setup logging
@@ -15,6 +17,13 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def load_config(config_path='config.yaml'):
+    """Load configuration from YAML file"""
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+    return config
 
 
 def oversample_per_aspect(df, aspect_col='aspect', label_col='sentiment', seed=42):
@@ -104,10 +113,34 @@ def oversample_per_aspect(df, aspect_col='aspect', label_col='sentiment', seed=4
 
 def main():
     """Main function to oversample training data"""
+    
+    # Parse arguments
+    parser = argparse.ArgumentParser(description='Per-aspect oversampling for ABSA training data')
+    parser.add_argument('--config', type=str, default='config.yaml',
+                       help='Path to config file (default: config.yaml)')
+    parser.add_argument('--seed', type=int, default=None,
+                       help='Random seed (overrides config if provided)')
+    args = parser.parse_args()
+    
     print("=" * 80)
     print("PhoBERT ABSA - Training Data Oversampling")
     print("=" * 80)
     print("")
+    
+    # Load config
+    logger.info("Loading configuration...")
+    config = load_config(args.config)
+    
+    # Get seed from config or argument
+    if args.seed is not None:
+        random_seed = args.seed
+        logger.info(f"Using seed from argument: {random_seed}")
+    else:
+        random_seed = config.get('reproducibility', {}).get('oversampling_seed', 42)
+        logger.info(f"Using seed from config: {random_seed}")
+    
+    logger.info(f"Random seed for oversampling: {random_seed}")
+    logger.info("")
     
     # File paths
     input_file = "data/train.csv"
@@ -136,7 +169,7 @@ def main():
     logger.info("")
     
     # Apply oversampling
-    df_oversampled = oversample_per_aspect(df)
+    df_oversampled = oversample_per_aspect(df, seed=random_seed)
     
     # Save result
     logger.info("")
@@ -145,6 +178,10 @@ def main():
     df_oversampled.to_csv(output_file, index=False, encoding='utf-8')
     logger.info(f"Saved {len(df_oversampled)} samples")
     logger.info("=" * 80)
+    logger.info("")
+    logger.info("Configuration used:")
+    logger.info(f"  Config file: {args.config}")
+    logger.info(f"  Random seed: {random_seed}")
     logger.info("")
     logger.info("Done! Use 'train_oversampled.csv' for training.")
 

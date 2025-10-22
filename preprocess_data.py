@@ -1,10 +1,19 @@
 import pandas as pd
 import numpy as np
+import yaml
 from pathlib import Path
 import logging
+import argparse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def load_config(config_path='config.yaml'):
+    """Load configuration from YAML file"""
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+    return config
 
 
 def convert_multi_aspect_to_single_label(input_file: str, output_file: str):
@@ -147,8 +156,32 @@ def split_data(input_file: str, output_dir: str, train_ratio=0.8, val_ratio=0.1,
 def main():
     """Main preprocessing pipeline"""
     
-    # Step 1: Convert multi-aspect to single-label format
+    # Parse arguments
+    parser = argparse.ArgumentParser(description='Preprocess ABSA dataset')
+    parser.add_argument('--config', type=str, default='config.yaml',
+                       help='Path to config file (default: config.yaml)')
+    parser.add_argument('--seed', type=int, default=None,
+                       help='Random seed (overrides config if provided)')
+    args = parser.parse_args()
+    
+    # Load config
     logger.info("=" * 60)
+    logger.info("Loading Configuration")
+    logger.info("=" * 60)
+    config = load_config(args.config)
+    
+    # Get seed from config or argument
+    if args.seed is not None:
+        random_seed = args.seed
+        logger.info(f"Using seed from argument: {random_seed}")
+    else:
+        random_seed = config.get('reproducibility', {}).get('data_split_seed', 42)
+        logger.info(f"Using seed from config: {random_seed}")
+    
+    logger.info(f"Random seed for all operations: {random_seed}")
+    
+    # Step 1: Convert multi-aspect to single-label format
+    logger.info("\n" + "=" * 60)
     logger.info("Step 1: Converting multi-aspect dataset to single-label format")
     logger.info("=" * 60)
     
@@ -169,15 +202,19 @@ def main():
         train_ratio=0.8,
         val_ratio=0.1,
         test_ratio=0.1,
-        random_state=42
+        random_state=random_seed  # Use seed from config
     )
     
     logger.info("\n" + "=" * 60)
     logger.info("Preprocessing complete!")
     logger.info("=" * 60)
-    logger.info(f"Next steps:")
+    logger.info(f"Configuration used:")
+    logger.info(f"  Config file: {args.config}")
+    logger.info(f"  Random seed: {random_seed}")
+    logger.info(f"\nNext steps:")
     logger.info(f"1. Review the generated files in the 'data/' directory")
-    logger.info(f"2. Run training: python train.py")
+    logger.info(f"2. (Optional) Run oversampling: python oversample_train.py")
+    logger.info(f"3. Run training: python train_phobert_trainer.py")
 
 
 if __name__ == '__main__':

@@ -138,3 +138,25 @@ general:
   seed: 42
   device: "auto"
   log_level: "info"
+
+# ========================================================================
+# Reproducibility Configuration (for Research)
+# ========================================================================
+# All random operations use the same seed for reproducible results
+reproducibility:
+  # Master seed - applied to all random operations
+  seed: 42
+  
+  # Data preprocessing
+  data_split_seed: 42        # Seed for train/val/test split
+  oversampling_seed: 42      # Seed for per-aspect oversampling
+  shuffle_seed: 42           # Seed for data shuffling
+  
+  # Training
+  training_seed: 42          # Seed for model training
+  data_loader_seed: 42       # Seed for data loader workers
+  
+  # Notes:
+  # - All seeds are set to 42 by default for consistency
+  # - Change all seeds together to ensure reproducibility
+  # - For experiments, use different seeds (e.g., 42, 123, 456, 789, 2024)
