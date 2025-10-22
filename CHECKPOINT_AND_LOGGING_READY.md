@@ -10,9 +10,11 @@ Thêm tính năng lưu checkpoint theo metric và logging training vào `train_p
 
 #### a) SimpleMetricCheckpointCallback
 - Đổi tên checkpoint theo metric value
-- Ví dụ: `checkpoint-500` → `checkpoint-87` (87% accuracy)
-- Ví dụ: `checkpoint-1000` → `checkpoint-91` (91% accuracy)
-- Dễ nhận biết checkpoint tốt nhất bằng mắt
+- **Default: F1 score với 4 chữ số (2 số thập phân)**
+- Ví dụ: `checkpoint-389` → `checkpoint-8723` (F1 = 87.23%)
+- Ví dụ: `checkpoint-778` → `checkpoint-9145` (F1 = 91.45%)
+- Format: F1 × 10000 = Name
+- Dễ nhận biết checkpoint tốt nhất với độ chính xác cao
 
 #### b) BestMetricCheckpointCallback  
 - Callback nâng cao (optional)
@@ -24,7 +26,18 @@ Thêm tính năng lưu checkpoint theo metric và logging training vào `train_p
 ```python
 from checkpoint_renamer import SimpleMetricCheckpointCallback
 
-callback = SimpleMetricCheckpointCallback(metric_name='eval_accuracy')
+# Default: F1 score với 4 chữ số
+callback = SimpleMetricCheckpointCallback(
+    metric_name='eval_f1',    # F1 score
+    multiply_by=10000         # 4 chữ số (0.8753 → 8753)
+)
+
+# Alternative: Accuracy với 2 chữ số
+callback = SimpleMetricCheckpointCallback(
+    metric_name='eval_accuracy',  # Accuracy
+    multiply_by=100              # 2 chữ số (0.87 → 87)
+)
+
 trainer.add_callback(callback)
 ```
 
@@ -62,8 +75,11 @@ def main():
 
 **Thêm callbacks vào Trainer:**
 ```python
-# Checkpoint renamer callback
-checkpoint_callback = SimpleMetricCheckpointCallback(metric_name='eval_accuracy')
+# Checkpoint renamer callback - F1 score với 4 chữ số
+checkpoint_callback = SimpleMetricCheckpointCallback(
+    metric_name='eval_f1',     # Sử dụng F1 score
+    multiply_by=10000          # 4 chữ số (2 số thập phân)
+)
 
 # Early stopping callback
 early_stopping_callback = EarlyStoppingCallback(
@@ -125,7 +141,7 @@ PhoBERT ABSA Training with HuggingFace Trainer
 ================================================================================
 Setting up Callbacks
 ================================================================================
-✓ Checkpoint Renamer: Will rename checkpoints by accuracy (e.g., checkpoint-91)
+✓ Checkpoint Renamer: Will rename checkpoints by F1 score (e.g., checkpoint-8753 = 87.53%)
 ✓ Early Stopping: patience=3, threshold=0.001
 
 ================================================================================
@@ -135,12 +151,17 @@ Setting up Callbacks
 Epoch 1/5: 100%|████████| 389/389 [05:23<00:00, 1.20it/s]
 Evaluation: 100%|████████| 25/25 [00:15<00:00, 1.65it/s]
 
-📁 Renamed: checkpoint-389 -> checkpoint-87 (eval_accuracy=0.8723)
+📁 Renamed: checkpoint-389 -> checkpoint-8723 (eval_f1=87.23%)
 
 Epoch 2/5: 100%|████████| 389/389 [05:20<00:00, 1.21it/s]
 Evaluation: 100%|████████| 25/25 [00:14<00:00, 1.72it/s]
 
-📁 Renamed: checkpoint-778 -> checkpoint-91 (eval_accuracy=0.9145)
+📁 Renamed: checkpoint-778 -> checkpoint-9145 (eval_f1=91.45%)
+
+Epoch 3/5: 100%|████████| 389/389 [05:18<00:00, 1.22it/s]
+Evaluation: 100%|████████| 25/25 [00:14<00:00, 1.78it/s]
+
+📁 Renamed: checkpoint-1167 -> checkpoint-9234 (eval_f1=92.34%)
 
 ...
 
@@ -174,9 +195,9 @@ Evaluation on Test Set
 ### Checkpoint Directory Structure:
 ```
 checkpoints/phobert_finetuned/
-├── checkpoint-87/          # Epoch 1 (87% accuracy)
-├── checkpoint-91/          # Epoch 2 (91% accuracy)
-├── checkpoint-93/          # Epoch 3 (93% accuracy) - BEST
+├── checkpoint-8723/        # Epoch 1 (F1 = 87.23%)
+├── checkpoint-9145/        # Epoch 2 (F1 = 91.45%)
+├── checkpoint-9234/        # Epoch 3 (F1 = 92.34%) - BEST
 └── best_model/             # Copy of best checkpoint
 ```
 
