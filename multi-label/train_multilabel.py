@@ -307,14 +307,19 @@ def main(args):
             all_sentiments = train_dataset.labels.flatten()
             unique, counts = np.unique(all_sentiments, return_counts=True)
             
-            total = counts.sum()
-            num_classes = 4  # negative, neutral, positive, none
+            # Calculate total ONLY for real sentiments (exclude class 3 = "none")
+            # This matches ViSoBERT behavior where we only have 3 classes
+            total_all = counts.sum()
+            mask_real = unique != 3
+            total = counts[mask_real].sum()
+            num_classes = 3  # negative, neutral, positive (exclude "none")
             
             # Calculate inverse frequency alpha for each sentiment class
             alpha = []
             sentiment_order = [0, 1, 2, 3]  # negative, neutral, positive, none
             
-            print(f"\n   Sentiment distribution:")
+            print(f"\n   Total: {total:,} (real sentiments only)")
+            print(f"   Sentiment distribution:")
             for sent_idx in sentiment_order:
                 if sent_idx in unique:
                     idx_in_unique = np.where(unique == sent_idx)[0][0]
@@ -323,15 +328,20 @@ def main(args):
                     count = 1  # Avoid division by zero
                 
                 sentiment_name = train_dataset.idx_to_sentiment[sent_idx]
-                pct = (count / total * 100) if total > 0 else 0
-                print(f"     {sentiment_name:10s}: {count:6,} ({pct:5.2f}%)")
+                # For "none", show percentage of total_all; for others, show percentage of total
+                if sent_idx == 3:
+                    pct = (count / total_all * 100) if total_all > 0 else 0
+                    print(f"     {sentiment_name:10s}: {count:6,} ({pct:5.2f}% of all)")
+                else:
+                    pct = (count / total * 100) if total > 0 else 0
+                    print(f"     {sentiment_name:10s}: {count:6,} ({pct:5.2f}%)")
                 
                 # Inverse frequency: total / (num_classes * count)
-                weight = total / (num_classes * count)
-                
-                # Reduce weight for 'none' class (it's not a real sentiment)
+                # For "none" class (idx=3), always use minimal weight
                 if sent_idx == 3:  # none
-                    weight = weight * 0.1  # Reduce by 90%
+                    weight = 0.01  # Fixed minimal weight (not used in loss anyway)
+                else:
+                    weight = total / (num_classes * count)
                 
                 alpha.append(weight)
             
