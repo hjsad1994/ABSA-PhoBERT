@@ -12,6 +12,12 @@ logger = logging.getLogger(__name__)
 
 def load_config(config_path='config.yaml'):
     """Load configuration from YAML file"""
+    import os
+    # If config_path is relative, resolve it relative to script directory
+    if not os.path.isabs(config_path):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(script_dir, config_path)
+    
     with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
     return config
@@ -213,17 +219,37 @@ def main():
     logger.info("Step 1: Converting multi-aspect dataset to single-label format")
     logger.info("=" * 60)
     
-    input_file = 'dataset.csv'
-    expanded_file = 'dataset_expanded.csv'
+    # Find dataset.csv (try both current dir and parent dir)
+    import os
+    if os.path.exists('dataset.csv'):
+        input_file = 'dataset.csv'
+    elif os.path.exists('../dataset.csv'):
+        input_file = '../dataset.csv'
+    else:
+        logger.error("dataset.csv not found in current or parent directory!")
+        logger.error(f"Current directory: {os.getcwd()}")
+        logger.error("Please ensure dataset.csv exists")
+        return
+    
+    logger.info(f"Found dataset at: {input_file}")
+    
+    # Output expanded file to single-label/ directory (relative to script location)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    expanded_file = os.path.join(script_dir, 'dataset_expanded.csv')
+    logger.info(f"Expanded file will be saved to: {expanded_file}")
     
     convert_multi_aspect_to_single_label(input_file, expanded_file)
     
     # Step 2: Split into train/val/test
     logger.info("\n" + "=" * 60)
-    logger.info("Step 2: Splitting data into train/val/test sets")
+    logger.info("Step 2: Splitting data into train/val/test sets (with stratification)")
     logger.info("=" * 60)
     
-    output_dir = 'data'
+    # Ensure output directory is in single-label/ (relative to script location)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_dir = os.path.join(script_dir, 'data')
+    logger.info(f"Output directory: {output_dir}")
+    
     split_data(
         expanded_file, 
         output_dir,

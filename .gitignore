@@ -1,48 +1,254 @@
-# Checkpoints and model weights
+# ============================================================================
+# ABSA-PhoBERT Project .gitignore
+# ============================================================================
+
+# ============================================================================
+# Checkpoints & Model Weights
+# ============================================================================
+# Training checkpoints (large files)
+single-label/checkpoints/
+multi-label/checkpoints/
 checkpoints/
+
+# Model files
 *.pt
 *.pth
 *.bin
 *.ckpt
+*.safetensors
+pytorch_model.bin
+model.safetensors
 
-# Logs
+# Best models (optional - uncomment if you want to commit them)
+# !single-label/checkpoints/best_model/
+# !multi-label/checkpoints/best_model/
+
+# ============================================================================
+# Training Logs & Results
+# ============================================================================
+# Training logs
+single-label/training_logs/
+multi-label/training_logs/
+training_logs/
 logs/
 *.log
 
-# Results and outputs
+# Results and predictions
+single-label/results/
+multi-label/results/
 results/
 outputs/
 predictions/
 
-# Python cache
+# Visualizations (generated plots)
+single-label/visualizations/
+multi-label/visualizations/
+visualizations/
+*.png
+*.jpg
+*.pdf
+
+# TensorBoard logs
+runs/
+tensorboard/
+
+# ============================================================================
+# Data Files
+# ============================================================================
+# Processed data (keep raw dataset.csv)
+single-label/data/*.csv
+multi-label/data/*.csv
+data/train.csv
+data/val.csv
+data/test.csv
+data/train_oversampled.csv
+
+# Exception: Keep original dataset
+!dataset.csv
+
+# Large data files
+*.h5
+*.hdf5
+*.npy
+*.npz
+
+# ============================================================================
+# Python
+# ============================================================================
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 
-# Virtual environments
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# ============================================================================
+# Virtual Environments
+# ============================================================================
 venv/
 env/
 ENV/
 .venv
+.pyenv
+pipenv/
+poetry.lock
 
-# IDE
+# Conda
+conda-env/
+.conda/
+
+# ============================================================================
+# IDEs & Editors
+# ============================================================================
+# VSCode
 .vscode/
+*.code-workspace
+
+# PyCharm
 .idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
 *.swp
 *.swo
 *~
+.netrwhist
 
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ============================================================================
 # Jupyter Notebook
+# ============================================================================
 .ipynb_checkpoints
+*.ipynb
+# Exception: Keep example notebooks
+!examples/*.ipynb
+!notebooks/*.ipynb
 
-# Data (if needed)
-# data/
-
-# OS
+# ============================================================================
+# OS Files
+# ============================================================================
+# macOS
 .DS_Store
-Thumbs.db
+.AppleDouble
+.LSOverride
+._*
 
-# HuggingFace cache
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# ============================================================================
+# HuggingFace & Transformers
+# ============================================================================
 .cache/
+.huggingface/
+transformers_cache/
+
+# Downloaded models (will be cached by HF)
+vinai/
+
+# ============================================================================
+# Project Specific
+# ============================================================================
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Experiment tracking
+wandb/
+mlruns/
+
+# Local configuration (if any)
+local_config.yaml
+.env
+.env.local
+
+# Debug files
+debug/
+debug_*.txt
+
+# Factory AI artifacts
+.factory/
+
+# ============================================================================
+# Documentation (optional)
+# ============================================================================
+# Uncomment if you don't want to track certain docs
+# *.md
+# docs/_build/
+
+# ============================================================================
+# Exceptions - Files to KEEP
+# ============================================================================
+# Keep configuration files
+!single-label/config.yaml
+!multi-label/config.yaml
+!config.yaml
+
+# Keep requirements
+!requirements.txt
+!single-label/requirements.txt
+!multi-label/requirements.txt
+
+# Keep source code
+!*.py
+
+# Keep documentation
+!*.md
+!README.md
+
+# Keep gitignore
+!.gitignore

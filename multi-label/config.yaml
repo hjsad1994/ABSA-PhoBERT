@@ -1,0 +1,255 @@
+# ============================================================================
+# PhoBERT Multi-Label ABSA Configuration
+# ============================================================================
+# Model: PhoBERT (vinai/phobert-base) for multi-label classification
+# Format: 11 aspects × 3 sentiments = 33 binary labels per sentence
+# Training: FP16, 8-bit optimizer, cosine scheduler, focal loss support
+# ============================================================================
+
+# ============================================================================
+# Paths Configuration
+# ============================================================================
+paths:
+  # Data files (relative to multi-label/ directory)
+  data_dir: "data"
+  # train_file: "data/train.csv"
+  train_file: "data/train_oversampled.csv"
+  validation_file: "data/val.csv"
+  test_file: "data/test.csv"
+  
+  # Output directories (created automatically during training)
+  output_dir: "checkpoints/phobert_multilabel"
+  evaluation_report: "results/evaluation_report.txt"
+  predictions_file: "results/test_predictions.csv"
+  log_dir: "training_logs"
+
+# ============================================================================
+# Model Configuration
+# ============================================================================
+model:
+  name: "vinai/phobert-base"
+  num_labels: 33  # 11 aspects × 3 sentiments
+  max_length: 256
+  dropout: 0.1
+  hidden_size: 768
+  problem_type: "multi_label_classification"  # Important for BCEWithLogitsLoss
+
+# ============================================================================
+# Valid Aspects (11 aspects)
+# ============================================================================
+valid_aspects:
+  - Battery
+  - Camera
+  - Performance
+  - Display
+  - Design
+  - Packaging
+  - Price
+  - Shop_Service
+  - Shipping
+  - General
+  - Others
+
+# ============================================================================
+# Sentiment Labels (3 sentiments)
+# ============================================================================
+sentiment_labels:
+  Negative: 0
+  Neutral: 1
+  Positive: 2
+
+# Label mapping: label_idx = aspect_idx * 3 + sentiment_idx
+# Example:
+#   Battery-Negative = 0*3+0 = label_0
+#   Battery-Neutral  = 0*3+1 = label_1
+#   Battery-Positive = 0*3+2 = label_2
+#   Camera-Negative  = 1*3+0 = label_3
+#   ...
+
+# ============================================================================
+# Data Configuration
+# ============================================================================
+data:
+  # Column names in CSV files
+  text_column: "sentence"
+  
+  # Multi-label format
+  format: "multi_label"
+  num_aspects: 11
+  num_sentiments: 3
+  
+  # Oversampling (optional for handling severe label imbalance)
+  # Set use_oversampled_file=true to use train_oversampled.csv
+  # Run oversample_train.py first to create it
+  use_oversampled_file: false
+
+# ============================================================================
+# Training Configuration
+# ============================================================================
+training:
+  # -------------------------------------------------------------------------
+  # Batch Size (optimized for RTX 4060 8GB VRAM)
+  # -------------------------------------------------------------------------
+  # per_device_train_batch_size: 16
+  # per_device_eval_batch_size: 32  # 2x train (no gradients in eval)
+  # gradient_accumulation_steps: 4   # Effective batch = 16 * 4 = 64
+  per_device_train_batch_size: 32
+  per_device_eval_batch_size: 64  # 2x train (no gradients in eval)
+  gradient_accumulation_steps: 2   # Effective batch = 16 * 4 = 64
+  # For different GPUs:
+  # - 6GB VRAM (RTX 3060):  batch=8,  accumulation=8  (effective=64)
+  # - 8GB VRAM (RTX 4060):  batch=16, accumulation=4  (effective=64)
+  # - 12GB VRAM (RTX 3080): batch=32, accumulation=2  (effective=64)
+  
+  # -------------------------------------------------------------------------
+  # Optimizer Settings
+  # -------------------------------------------------------------------------
+  optim: "adamw_bnb_8bit"  # 8-bit AdamW (memory efficient)
+  learning_rate: 2.0e-5
+  weight_decay: 0.01
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_epsilon: 1.0e-8
+  max_grad_norm: 1.0
+  
+  # -------------------------------------------------------------------------
+  # Learning Rate Scheduler
+  # -------------------------------------------------------------------------
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.06  # 6% of training steps for warmup
+  
+  # -------------------------------------------------------------------------
+  # Training Duration
+  # -------------------------------------------------------------------------
+  num_train_epochs: 15
+  
+  # -------------------------------------------------------------------------
+  # Mixed Precision (RTX 4060 Ada Lovelace architecture)
+  # -------------------------------------------------------------------------
+  fp16: true
+  fp16_opt_level: "O2"
+  fp16_full_eval: false
+  tf32: true  # Tensor Float 32 for faster matrix operations
+  
+  # -------------------------------------------------------------------------
+  # DataLoader Settings
+  # -------------------------------------------------------------------------
+  dataloader_num_workers: 4
+  dataloader_pin_memory: true
+  dataloader_prefetch_factor: 2
+  dataloader_persistent_workers: true
+  
+  # -------------------------------------------------------------------------
+  # Memory Optimization
+  # -------------------------------------------------------------------------
+  gradient_checkpointing: false
+  auto_find_batch_size: false
+  group_by_length: false
+  
+  # -------------------------------------------------------------------------
+  # Evaluation & Checkpointing
+  # -------------------------------------------------------------------------
+  evaluation_strategy: "epoch"
+  save_strategy: "epoch"
+  save_steps: 500
+  eval_steps: 500
+  save_total_limit: 3  # Keep only 3 best checkpoints
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_f1_micro"  # Micro F1 for multi-label
+  greater_is_better: true
+  
+  # -------------------------------------------------------------------------
+  # Early Stopping
+  # -------------------------------------------------------------------------
+  early_stopping_patience: 3
+  early_stopping_threshold: 0.001
+  
+  # -------------------------------------------------------------------------
+  # Logging
+  # -------------------------------------------------------------------------
+  logging_strategy: "steps"
+  logging_steps: 50
+  logging_first_step: true
+  report_to: []  # Empty = no external logging (wandb, tensorboard, etc.)
+  
+  # -------------------------------------------------------------------------
+  # Misc
+  # -------------------------------------------------------------------------
+  disable_tqdm: false
+  prediction_loss_only: false
+  remove_unused_columns: true
+  label_names: ["labels"]
+  include_inputs_for_metrics: false
+
+  # -------------------------------------------------------------------------
+  # Loss Function Configuration
+  # -------------------------------------------------------------------------
+  # Options:
+  #   "bce":          Standard BCEWithLogitsLoss (default, fast)
+  #   "focal":        Focal Loss (handles imbalance, recommended)
+  #   "weighted_bce": Weighted BCE (automatic weight calculation)
+  
+  loss_type: "focal"
+  
+  # Focal Loss parameters (used if loss_type="focal")
+  focal_alpha: "auto"  # Options: "auto" (calculate from data), or float value (0.1-0.9)
+                       # 0.25 = balanced, higher = more weight on positive examples
+                       # "auto" will calculate optimal value from training data distribution
+  focal_gamma: 2.0     # Focusing parameter (0 = BCE, higher = more focus on hard examples)
+  
+  # Weighted BCE (used if loss_type="weighted_bce")
+  # pos_weights are calculated automatically from training data
+  
+  # Prediction threshold for binary classification
+  threshold: 0.5
+
+# ============================================================================
+# General Settings
+# ============================================================================
+general:
+  device: "auto"  # Auto-detect GPU/CPU
+  log_level: "info"
+
+# ============================================================================
+# Reproducibility Configuration (for Research)
+# ============================================================================
+# All random operations use the same seed for reproducible results
+reproducibility:
+  # Master seed - change this to run different experiments
+  seed: 42
+  
+  # Specific seeds for different operations
+  data_split_seed: 42        # For train/val/test split
+  oversampling_seed: 42      # For oversampling rare labels
+  shuffle_seed: 42           # For data shuffling
+  training_seed: 42          # For model training
+  data_loader_seed: 42       # For data loader workers
+  
+  # For experiments with multiple seeds:
+  # Try: 42, 123, 456, 789, 2024
+  # Report: mean ± std across seeds
+
+# ============================================================================
+# Notes & Tips
+# ============================================================================
+# 
+# Loss Function Selection:
+# - Use "bce" for baseline (fast, simple)
+# - Use "focal" for imbalanced data (recommended, +2-3% F1)
+# - Use "weighted_bce" if focal doesn't work well
+#
+# Oversampling:
+# - Usually NOT needed for multi-label (naturally more balanced)
+# - Use only if some labels have < 100 samples
+# - Run: python oversample_train.py
+# - Then set: use_oversampled_file: true
+#
+# Training Time (RTX 4060):
+# - ~20-25 minutes for 5 epochs
+# - ~4-5 minutes per epoch
+#
+# Expected Performance:
+# - F1 (micro): 0.86-0.88
+# - F1 (macro): 0.83-0.86
+# - With Focal Loss: +2-3% improvement
+# ============================================================================

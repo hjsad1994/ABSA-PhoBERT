@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 def load_config(config_path='config.yaml'):
     """Load configuration from YAML file"""
+    import os
+    # If config_path is relative, resolve it relative to script directory
+    if not os.path.isabs(config_path):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(script_dir, config_path)
+    
     with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
     return config
@@ -142,9 +148,16 @@ def main():
     logger.info(f"Random seed for oversampling: {random_seed}")
     logger.info("")
     
-    # File paths
-    input_file = "data/train.csv"
-    output_file = "data/train_oversampled.csv"
+    # File paths relative to script location (ensures data/ in single-label/)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(script_dir, "data")
+    input_file = os.path.join(data_dir, "train.csv")
+    output_file = os.path.join(data_dir, "train_oversampled.csv")
+    
+    logger.info(f"Data directory: {data_dir}")
+    
+    # Ensure data directory exists
+    os.makedirs(data_dir, exist_ok=True)
     
     # Check input file exists
     if not os.path.exists(input_file):

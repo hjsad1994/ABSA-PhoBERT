@@ -18,6 +18,12 @@ def set_seed(seed: int):
 
 def load_config(config_path: str) -> Dict[str, Any]:
     """Load configuration from YAML file"""
+    import os
+    # If config_path is relative, resolve it relative to script directory
+    if not os.path.isabs(config_path):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(script_dir, config_path)
+    
     with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
     return config

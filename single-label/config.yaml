@@ -1,0 +1,262 @@
+# ============================================================================
+# PhoBERT Single-Label ABSA Configuration
+# ============================================================================
+# Model: PhoBERT (vinai/phobert-base) for 3-class sentiment classification
+# Format: Sentence-aspect pairs (one sentiment per pair)
+# Training: FP16, 8-bit optimizer, cosine scheduler, per-aspect oversampling
+# ============================================================================
+
+# ============================================================================
+# Paths Configuration
+# ============================================================================
+paths:
+  # Data files (relative to single-label/ directory)
+  data_dir: "data"
+  train_file: "data/train.csv"
+  train_oversampled_file: "data/train_oversampled.csv"
+  validation_file: "data/val.csv"
+  test_file: "data/test.csv"
+  
+  # Output directories (created automatically during training)
+  output_dir: "checkpoints/phobert_finetuned"
+  evaluation_report: "results/evaluation_report.txt"
+  predictions_file: "results/test_predictions.csv"
+  log_dir: "training_logs"
+
+# ============================================================================
+# Model Configuration
+# ============================================================================
+model:
+  name: "vinai/phobert-base"
+  num_labels: 3  # Negative (0), Neutral (1), Positive (2)
+  max_length: 256
+  dropout: 0.1
+  hidden_size: 768
+  problem_type: "single_label_classification"
+
+# ============================================================================
+# Valid Aspects (11 aspects)
+# ============================================================================
+valid_aspects:
+  - Battery
+  - Camera
+  - Performance
+  - Display
+  - Design
+  - Packaging
+  - Price
+  - Shop_Service
+  - Shipping
+  - General
+  - Others
+
+# ============================================================================
+# Sentiment Labels (3 sentiments)
+# ============================================================================
+sentiment_labels:
+  Negative: 0
+  Neutral: 1
+  Positive: 2
+
+# ============================================================================
+# Data Configuration
+# ============================================================================
+data:
+  # Column names in CSV files
+  text_column: "sentence"
+  aspect_column: "aspect"
+  label_column: "sentiment"
+  
+  # Oversampling (balances sentiments within each aspect independently)
+  # Set use_oversampled_file=true to use train_oversampled.csv
+  # Run oversample_train.py first to create it
+  use_oversampled_file: true
+  
+  # On-the-fly oversampling (legacy, not recommended)
+  # Only used if use_oversampled_file=false
+  oversampling: false
+  oversampling_strategy: "per_aspect"
+
+# ============================================================================
+# Training Configuration
+# ============================================================================
+training:
+  # -------------------------------------------------------------------------
+  # Batch Size (optimized for RTX 4060 8GB VRAM)
+  # -------------------------------------------------------------------------
+  per_device_train_batch_size: 16
+  per_device_eval_batch_size: 32  # 2x train (no gradients in eval)
+  gradient_accumulation_steps: 4   # Effective batch = 16 * 4 = 64
+
+  # For different GPUs:
+  # - 6GB VRAM (RTX 3060):  batch=8,  accumulation=8  (effective=64)
+  # - 8GB VRAM (RTX 4060):  batch=16, accumulation=4  (effective=64)
+  # - 12GB VRAM (RTX 3080): batch=32, accumulation=2  (effective=64)
+  
+  # -------------------------------------------------------------------------
+  # Optimizer Settings
+  # -------------------------------------------------------------------------
+  optim: "adamw_bnb_8bit"  # 8-bit AdamW (memory efficient)
+  learning_rate: 2.0e-5
+  weight_decay: 0.01
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_epsilon: 1.0e-8
+  max_grad_norm: 1.0
+  
+  # -------------------------------------------------------------------------
+  # Learning Rate Scheduler
+  # -------------------------------------------------------------------------
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.06  # 6% of training steps for warmup
+  
+  # -------------------------------------------------------------------------
+  # Training Duration
+  # -------------------------------------------------------------------------
+  num_train_epochs: 5
+  
+  # -------------------------------------------------------------------------
+  # Mixed Precision (RTX 4060 Ada Lovelace architecture)
+  # -------------------------------------------------------------------------
+  fp16: true
+  fp16_opt_level: "O2"
+  fp16_full_eval: false
+  tf32: true  # Tensor Float 32 for faster matrix operations
+  
+  # -------------------------------------------------------------------------
+  # DataLoader Settings
+  # -------------------------------------------------------------------------
+  dataloader_num_workers: 4
+  dataloader_pin_memory: true
+  dataloader_prefetch_factor: 2
+  dataloader_persistent_workers: true
+  
+  # -------------------------------------------------------------------------
+  # Memory Optimization
+  # -------------------------------------------------------------------------
+  gradient_checkpointing: false
+  auto_find_batch_size: false
+  group_by_length: false
+  
+  # -------------------------------------------------------------------------
+  # Evaluation & Checkpointing
+  # -------------------------------------------------------------------------
+  evaluation_strategy: "epoch"
+  save_strategy: "epoch"
+  save_steps: 500
+  eval_steps: 500
+  save_total_limit: 3  # Keep only 3 best checkpoints
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_f1"  # Use F1 score for best model selection
+  greater_is_better: true
+  
+  # -------------------------------------------------------------------------
+  # Early Stopping
+  # -------------------------------------------------------------------------
+  early_stopping_patience: 3
+  early_stopping_threshold: 0.001
+  
+  # -------------------------------------------------------------------------
+  # Logging
+  # -------------------------------------------------------------------------
+  logging_strategy: "steps"
+  logging_steps: 50
+  logging_first_step: true
+  report_to: []  # Empty = no external logging (wandb, tensorboard, etc.)
+  
+  # -------------------------------------------------------------------------
+  # Misc
+  # -------------------------------------------------------------------------
+  disable_tqdm: false
+  prediction_loss_only: false
+  remove_unused_columns: true
+  label_names: ["labels"]
+  include_inputs_for_metrics: false
+
+  # -------------------------------------------------------------------------
+  # Checkpoint Naming
+  # -------------------------------------------------------------------------
+  # Checkpoints are renamed by F1 score (4 digits)
+  # Example: F1=0.8753 → checkpoint-8753
+  # This is handled by SimpleMetricCheckpointCallback in checkpoint_renamer.py
+
+  # -------------------------------------------------------------------------
+  # Loss Function Configuration
+  # -------------------------------------------------------------------------
+  # Options:
+  #   "ce":    Standard CrossEntropyLoss (default, fast)
+  #   "focal": Focal Loss (handles imbalance, recommended)
+  
+  loss_type: "ce"  # Options: ce, focal
+  
+  # Focal Loss parameters (used if loss_type="focal")
+  focal_alpha: "auto"  # Options: "auto" (calculate from data), or float value (0.1-0.9)
+                       # "auto" automatically calculates optimal alpha from class distribution
+                       # Example: 0.25 = more weight on positive class
+  focal_gamma: 2.0     # Focusing parameter (0 = CE, higher = more focus on hard examples)
+  
+  # When to use Focal Loss:
+  # - Class imbalance (e.g., Neutral is much rarer than Positive/Negative)
+  # - Want to focus on hard-to-classify examples
+  # - Expect +1-2% F1 improvement
+
+# ============================================================================
+# General Settings
+# ============================================================================
+general:
+  device: "auto"  # Auto-detect GPU/CPU
+  log_level: "info"
+
+# ============================================================================
+# Reproducibility Configuration (for Research)
+# ============================================================================
+# All random operations use the same seed for reproducible results
+reproducibility:
+  # Master seed - change this to run different experiments
+  seed: 42
+  
+  # Specific seeds for different operations
+  data_split_seed: 42        # For train/val/test split (in preprocess_data.py)
+  oversampling_seed: 42      # For per-aspect oversampling
+  shuffle_seed: 42           # For data shuffling
+  training_seed: 42          # For model training
+  data_loader_seed: 42       # For data loader workers
+  
+  # For experiments with multiple seeds:
+  # Try: 42, 123, 456, 789, 2024
+  # Report: mean ± std across seeds
+
+# ============================================================================
+# Notes & Tips
+# ============================================================================
+# 
+# Data Format:
+# - CSV with columns: sentence, aspect, sentiment
+# - Example: "Pin tốt", "Battery", "Positive"
+# - Each row is one sentence-aspect pair
+#
+# Oversampling:
+# - Balances sentiments within each aspect independently
+# - Example: Battery has 100 Positive, 50 Negative, 20 Neutral
+#   → After oversampling: 100 each (total 300 for Battery)
+# - Run: python oversample_train.py
+# - Then set: use_oversampled_file: true
+#
+# Checkpoint Naming:
+# - Checkpoints renamed by F1 score automatically
+# - checkpoint-8753 means F1 = 87.53%
+# - checkpoint-9234 means F1 = 92.34%
+# - Easy to identify best checkpoint
+#
+# Training Time (RTX 4060):
+# - ~25-30 minutes for 5 epochs
+# - ~5-6 minutes per epoch
+# - With oversampling: ~21,060 samples
+#
+# Expected Performance:
+# - F1 Score: 0.91-0.93
+# - Accuracy: 0.92-0.94
+# - Positive: F1 ~0.95
+# - Negative: F1 ~0.92
+# - Neutral: F1 ~0.88
+# ============================================================================
