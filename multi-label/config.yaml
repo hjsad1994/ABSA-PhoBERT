@@ -2,7 +2,7 @@
 # PhoBERT Multi-Label ABSA Configuration
 # ============================================================================
 # Model: PhoBERT (vinai/phobert-base) for multi-label classification
-# Format: 11 aspects × 3 sentiments = 33 binary labels per sentence
+# Format: 11 aspects, each with 4 classes (Negative, Neutral, Positive, None)
 # Training: FP16, 8-bit optimizer, cosine scheduler, focal loss support
 # ============================================================================
 
@@ -12,10 +12,10 @@
 paths:
   # Data files (relative to multi-label/ directory)
   data_dir: "data"
-  # train_file: "data/train.csv"
-  train_file: "data/train_oversampled.csv"
-  validation_file: "data/val.csv"
-  test_file: "data/test.csv"
+  train_file: "data/train_multilabel_balanced.csv"  # True multi-label format
+  # train_file: "data/train_oversampled.csv"  # Old single-label format
+  validation_file: "data/validation_multilabel.csv"
+  test_file: "data/test_multilabel.csv"
   
   # Output directories (created automatically during training)
   output_dir: "checkpoints/phobert_multilabel"
@@ -28,11 +28,13 @@ paths:
 # ============================================================================
 model:
   name: "vinai/phobert-base"
-  num_labels: 33  # 11 aspects × 3 sentiments
+  num_labels: 44  # 11 aspects × 4 classes (Negative, Neutral, Positive, None)
+  num_aspects: 11
+  num_sentiments: 4
   max_length: 256
   dropout: 0.1
   hidden_size: 768
-  problem_type: "multi_label_classification"  # Important for BCEWithLogitsLoss
+  problem_type: "multi_output_classification"  # Each aspect is 4-class classification
 
 # ============================================================================
 # Valid Aspects (11 aspects)
@@ -51,20 +53,17 @@ valid_aspects:
   - Others
 
 # ============================================================================
-# Sentiment Labels (3 sentiments)
+# Sentiment Labels (4 classes per aspect)
 # ============================================================================
 sentiment_labels:
   Negative: 0
   Neutral: 1
   Positive: 2
+  None: 3  # No sentiment for this aspect
 
-# Label mapping: label_idx = aspect_idx * 3 + sentiment_idx
-# Example:
-#   Battery-Negative = 0*3+0 = label_0
-#   Battery-Neutral  = 0*3+1 = label_1
-#   Battery-Positive = 0*3+2 = label_2
-#   Camera-Negative  = 1*3+0 = label_3
-#   ...
+# Format:
+#   Each aspect can have one of 4 classes: Negative, Neutral, Positive, or None (empty)
+#   Example row: sentence="Pin tốt", Battery=Positive, Camera=None, Performance=None, ...
 
 # ============================================================================
 # Data Configuration
@@ -73,10 +72,10 @@ data:
   # Column names in CSV files
   text_column: "sentence"
   
-  # Multi-label format
-  format: "multi_label"
+  # Multi-output format (11 aspects, 4 classes each)
+  format: "multi_output"
   num_aspects: 11
-  num_sentiments: 3
+  num_sentiments: 4  # Negative, Neutral, Positive, None
   
   # Oversampling (optional for handling severe label imbalance)
   # Set use_oversampled_file=true to use train_oversampled.csv
@@ -121,7 +120,7 @@ training:
   # -------------------------------------------------------------------------
   # Training Duration
   # -------------------------------------------------------------------------
-  num_train_epochs: 15
+  num_train_epochs: 8
   
   # -------------------------------------------------------------------------
   # Mixed Precision (RTX 4060 Ada Lovelace architecture)
@@ -153,7 +152,7 @@ training:
   save_strategy: "epoch"
   save_steps: 500
   eval_steps: 500
-  save_total_limit: 3  # Keep only 3 best checkpoints
+  save_total_limit: 4  # Keep only 3 best checkpoints
   load_best_model_at_end: true
   metric_for_best_model: "eval_f1_micro"  # Micro F1 for multi-label
   greater_is_better: true
