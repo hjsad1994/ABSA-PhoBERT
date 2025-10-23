@@ -473,7 +473,7 @@ def main(args):
     output_dir = args.output_dir if args.output_dir else config['paths']['output_dir']
     
     # Load best checkpoint
-    best_checkpoint = torch.load(os.path.join(output_dir, 'best_model.pt'))
+    best_checkpoint = torch.load(os.path.join(output_dir, 'best_model.pt'), weights_only=False)
     model.load_state_dict(best_checkpoint['model_state_dict'])
     
     test_metrics = evaluate(model, test_loader, device, aspect_names)
