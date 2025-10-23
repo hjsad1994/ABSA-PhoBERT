@@ -56,12 +56,12 @@ tensorboard/
 # Data Files
 # ============================================================================
 # Processed data (keep raw dataset.csv)
-single-label/data/*.csv
-multi-label/data/*.csv
-data/train.csv
-data/val.csv
-data/test.csv
-data/train_oversampled.csv
+# single-label/data/*.csv
+# multi-label/data/*.csv
+# data/train.csv
+# data/val.csv
+# data/test.csv
+# data/train_oversampled.csv
 
 # Exception: Keep original dataset
 !dataset.csv
