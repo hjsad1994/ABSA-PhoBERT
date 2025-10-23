@@ -228,36 +228,57 @@ def calculate_global_alpha(
     
     # Count sentiment occurrences
     counts = Counter(all_sentiments)
-    total = sum(counts.values())
+    
+    # Calculate total ONLY for real sentiments (exclude "none")
+    real_sentiments = ['negative', 'neutral', 'positive']
+    total = sum(counts.get(s, 0) for s in real_sentiments)
+    total_all = sum(counts.values())
     
     # Display distribution
-    print(f"\n   Total aspect-sentiment pairs: {total:,}")
+    print(f"\n   Total aspect-sentiment pairs: {total:,} (real sentiments only)")
+    if counts.get('none', 0) > 0:
+        print(f"   Total including 'none': {total_all:,}")
     print(f"\n   Sentiment distribution:")
     
     # Order must match dataset_multilabel.py: [negative, neutral, positive, none]
     sentiment_order = ['negative', 'neutral', 'positive', 'none']
     for sentiment in sentiment_order:
         count = counts.get(sentiment, 0)
-        pct = (count / total * 100) if total > 0 else 0
+        pct = (count / total * 100) if total > 0 and sentiment != 'none' else (count / total_all * 100) if total_all > 0 else 0
         print(f"     {sentiment:10s}: {count:6,} ({pct:5.2f}%)")
     
     # Calculate alpha weights based on method
     alpha = []
-    num_classes = len(sentiment_to_idx)
+    # IMPORTANT: Use num_classes = 3 (only real sentiments: Neg, Neu, Pos)
+    # Don't count "none" as it's filtered out in loss computation
+    num_classes = 3
     
     if method == 'inverse_freq':
         # Inverse frequency weighting: total / (num_classes * count)
         for sentiment in sentiment_order:
-            count = max(counts.get(sentiment, 0), 1)  # Avoid division by zero
-            weight = total / (num_classes * count)
+            count = counts.get(sentiment, 0)
+            if count == 0 or sentiment == 'none':
+                # Class not in training data OR it's "none" class
+                # Set very small weight to avoid affecting loss
+                weight = 0.01
+            else:
+                weight = total / (num_classes * count)
             alpha.append(weight)
     
     elif method == 'balanced':
         # Balanced weighting: max_count / count
-        max_count = max(counts.values())
+        # Only consider real sentiments (not "none")
+        real_sentiments = ['negative', 'neutral', 'positive']
+        real_counts = [counts.get(s, 0) for s in real_sentiments]
+        max_count = max(real_counts) if real_counts else 1
+        
         for sentiment in sentiment_order:
-            count = max(counts.get(sentiment, 0), 1)
-            weight = max_count / count
+            count = counts.get(sentiment, 0)
+            if count == 0 or sentiment == 'none':
+                # Class not in training data OR it's "none" class
+                weight = 0.01
+            else:
+                weight = max_count / count
             alpha.append(weight)
     
     # Display calculated weights
